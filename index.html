@@ -1,59 +1,203 @@
-<div>Teachable Machine Image Model</div>
-<button type="button" onclick="init()">Start</button>
-<div id="webcam-container"></div>
-<div id="label-container"></div>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-<script type="text/javascript">
-    // More API functions here:
-    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ball Detection System</title>
 
-    // the link to your model provided by Teachable Machine export panel
-    const URL = "./my_model/";
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
-    let model, webcam, labelContainer, maxPredictions;
-
-    // Load the image model and setup the webcam
-    async function init() {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
-
-        // load the model and metadata
-        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
-        // or files from your local hard drive
-        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
-
-        // Convenience function to setup a webcam
-        const flip = true; // whether to flip the webcam
-        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
-        await webcam.setup(); // request access to the webcam
-        await webcam.play();
-        window.requestAnimationFrame(loop);
-
-        // append elements to the DOM
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) { // and class labels
-            labelContainer.appendChild(document.createElement("div"));
+    <style>
+        body {
+            margin: 0;
+            font-family: "Poppins", sans-serif;
+            background: linear-gradient(145deg, #141416, #2b2b30);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
         }
-    }
 
-    async function loop() {
-        webcam.update(); // update the webcam frame
-        await predict();
-        window.requestAnimationFrame(loop);
-    }
-
-    // run the webcam image through the image model
-    async function predict() {
-        // predict can take in an image, video or canvas html element
-        const prediction = await model.predict(webcam.canvas);
-        for (let i = 0; i < maxPredictions; i++) {
-            const classPrediction =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-            labelContainer.childNodes[i].innerHTML = classPrediction;
+        .container {
+            width: 95%;
+            max-width: 900px;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(10px);
         }
-    }
-</script>
+
+        h1 {
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .btn {
+            display: inline-block;
+            margin: 10px;
+            padding: 12px 25px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            background: #00e6ac;
+            color: black;
+            font-weight: 600;
+            transition: 0.25s;
+        }
+        .btn:hover { transform: scale(1.07); }
+
+        #themeToggle {
+            background: #6fb1ff;
+        }
+
+        .scoreboard {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 15px;
+            background: rgba(255,255,255,0.12);
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.2rem;
+        }
+
+        #webcam-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .flash-good {
+            animation: flashGreen 0.4s ease;
+        }
+        .flash-bad {
+            animation: flashRed 0.4s ease;
+        }
+
+        @keyframes flashGreen {
+            0% { box-shadow: 0 0 25px 5px lime; }
+            100% { box-shadow: none; }
+        }
+        @keyframes flashRed {
+            0% { box-shadow: 0 0 25px 5px red; }
+            100% { box-shadow: none; }
+        }
+
+        .img-row {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .img-row img {
+            width: 30%;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="mainBox">
+        <h1>Ball In/Out, Foot Fault Detection</h1>
+
+        <button class="btn" onclick="init()">Start Detection</button>
+        <button class="btn" id="themeToggle" onclick="toggleTheme()">Switch Theme</button>
+
+        <div class="scoreboard">
+            <span>In Points: <strong id="inScore">0</strong></span>
+            <span>Out Points: <strong id="outScore">0</strong></span>
+        </div>
+
+        <div class="img-row">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/0/0e/Tennis_ball_rolling.jpg" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Volleyball.jpg" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/b/bf/Tennis_Foot_Fault.jpg" />
+        </div>
+
+        <div id="webcam-container"></div>
+        <div id="label-container"></div>
+    </div>
+
+    <audio id="goodSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+    <audio id="badSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+
+    <script>
+        const URL = "./my_model/";
+        let model, webcam, labelContainer, maxPredictions;
+        let inScore = 0;
+        let outScore = 0;
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            const flip = true;
+            webcam = new tmImage.Webcam(300, 300, flip);
+            await webcam.setup();
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+
+            handleLogic(prediction);
+        }
+
+        function handleLogic(pred) {
+            let mainBox = document.getElementById("mainBox");
+
+            const inProb = pred.find(p => p.className.toLowerCase() === "in");
+            const outProb = pred.find(p => p.className.toLowerCase() === "out");
+
+            if (!inProb || !outProb) return;
+
+            if (inProb.probability > 0.85) {
+                inScore++;
+                document.getElementById("inScore").innerText = inScore;
+                document.getElementById("goodSound").play();
+                mainBox.classList.add("flash-good");
+                setTimeout(() => mainBox.classList.remove("flash-good"), 300);
+            }
+
+            if (outProb.probability > 0.85) {
+                outScore++;
+                document.getElementById("outScore").innerText = outScore;
+                document.getElementById("badSound").play();
+                mainBox.classList.add("flash-bad");
+                setTimeout(() => mainBox.classList.remove("flash-bad"), 300);
+            }
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle("lightMode");
+        }
+    </script>
+</body>
+</html>
