@@ -1,203 +1,173 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ball Detection System</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-
+    <title>Ball Detection</title>
     <style>
         body {
             margin: 0;
-            font-family: "Poppins", sans-serif;
-            background: linear-gradient(145deg, #141416, #2b2b30);
+            padding: 0;
+            font-family: Arial, sans-serif;
+            transition: 0.4s;
+            background: #101010;
             color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            text-align: center;
+        }
+
+        #mainBox {
             padding: 20px;
+            transition: 0.4s;
         }
 
-        .container {
-            width: 95%;
-            max-width: 900px;
-            background: rgba(255, 255, 255, 0.08);
-            padding: 25px;
-            border-radius: 20px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.45);
-            backdrop-filter: blur(10px);
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-
-        .btn {
-            display: inline-block;
-            margin: 10px;
-            padding: 12px 25px;
-            font-size: 1rem;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            background: #00e6ac;
-            color: black;
-            font-weight: 600;
-            transition: 0.25s;
-        }
-        .btn:hover { transform: scale(1.07); }
-
-        #themeToggle {
-            background: #6fb1ff;
-        }
-
-        .scoreboard {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 15px;
-            background: rgba(255,255,255,0.12);
-            display: flex;
-            justify-content: space-between;
-            font-size: 1.2rem;
-        }
-
-        #webcam-container {
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .flash-good {
-            animation: flashGreen 0.4s ease;
-        }
-        .flash-bad {
-            animation: flashRed 0.4s ease;
-        }
-
-        @keyframes flashGreen {
-            0% { box-shadow: 0 0 25px 5px lime; }
-            100% { box-shadow: none; }
-        }
-        @keyframes flashRed {
-            0% { box-shadow: 0 0 25px 5px red; }
-            100% { box-shadow: none; }
-        }
-
-        .img-row {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 20px;
-        }
         .img-row img {
-            width: 30%;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            width: 120px;
+            margin: 10px;
+            border-radius: 10px;
+            transition: 0.4s;
         }
+
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            transition: 0.3s;
+        }
+        button:hover { background: #666; }
+
+        /* THEMES */
+        .tennis-theme {
+            background: linear-gradient(#0f0, #060);
+        }
+        .volleyball-theme {
+            background: linear-gradient(#008cff, #003e7a);
+        }
+
+        .tennis-img {
+            border: 4px solid #00ff00;
+        }
+
+        .volleyball-img {
+            border: 4px solid #009dff;
+        }
+
     </style>
 </head>
 <body>
-    <div class="container" id="mainBox">
-        <h1>Ball In/Out, Foot Fault Detection</h1>
 
-        <button class="btn" onclick="init()">Start Detection</button>
-        <button class="btn" id="themeToggle" onclick="toggleTheme()">Switch Theme</button>
+    <button onclick="goHome()">Home</button>
+        <h1 id="modeStatus">Mode: Default</h1>
 
-        <div class="scoreboard">
-            <span>In Points: <strong id="inScore">0</strong></span>
-            <span>Out Points: <strong id="outScore">0</strong></span>
+    <div id="mainBox">
+        <div class="img-row" id="imageRow">
+            <img id="img1" src="https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg">
+            <img id="img2" src="https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg">
+            <img id="img3" src="https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg">
         </div>
 
-        <div class="img-row">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/0/0e/Tennis_ball_rolling.jpg" />
-            <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Volleyball.jpg" />
-            <img src="https://upload.wikimedia.org/wikipedia/commons/b/bf/Tennis_Foot_Fault.jpg" />
-        </div>
-
-        <div id="webcam-container"></div>
-        <div id="label-container"></div>
+        <button onclick="setTennis()">Switch to Tennis Theme</button>
+        <button onclick="setVolleyball()">Switch to Volleyball Theme</button>
+        <br>
+        <button onclick="startDetection()">Start Detection</button>
     </div>
 
-    <audio id="goodSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
-    <audio id="badSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script>
+    let lastTheme = "default";
 
-    <script>
-        const URL = "./my_model/";
-        let model, webcam, labelContainer, maxPredictions;
-        let inScore = 0;
-        let outScore = 0;
+    const tennisImages = [
+        "https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg"
+    ];
 
-        async function init() {
-            const modelURL = URL + "model.json";
-            const metadataURL = URL + "metadata.json";
+    const volleyballImages = [
+        "https://upload.wikimedia.org/wikipedia/commons/7/7e/Volleyball_%28International%29.png",
+        "https://upload.wikimedia.org/wikipedia/commons/7/7e/Volleyball_%28International%29.png",
+        "https://upload.wikimedia.org/wikipedia/commons/7/7e/Volleyball_%28International%29.png"
+    ];
 
-            model = await tmImage.load(modelURL, metadataURL);
-            maxPredictions = model.getTotalClasses();
+    const originalImages = [...tennisImages];
 
-            const flip = true;
-            webcam = new tmImage.Webcam(300, 300, flip);
-            await webcam.setup();
-            await webcam.play();
-            window.requestAnimationFrame(loop);
+    function setTennis() {
+        document.body.className = "tennis-theme";
+        lastTheme = "tennis";
+        document.getElementById("modeStatus").textContent = "Mode: Tennis";
 
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
-            labelContainer = document.getElementById("label-container");
-            for (let i = 0; i < maxPredictions; i++) {
-                labelContainer.appendChild(document.createElement("div"));
-            }
+        document.querySelectorAll('.img-row img').forEach((img, i) => {
+            img.src = tennisImages[i];
+            img.className = "tennis-img";
+        });
+    }
+
+    function setVolleyball() {
+        document.body.className = "volleyball-theme";
+        lastTheme = "volleyball";
+        document.getElementById("modeStatus").textContent = "Mode: Volleyball";
+
+        document.querySelectorAll('.img-row img').forEach((img, i) => {
+            img.src = volleyballImages[i];
+            img.className = "volleyball-img";
+        });
+    }
+
+    /* LOAD AI MODEL + SWITCH TO ORIGINAL DETECTION SCREEN */
+
+    const URL = "./my_model/";
+    let model, webcam, labelContainer, maxPredictions;
+
+    function goHome() {
+        // Reset to main screen
+        document.getElementById('mainBox').style.display = 'block';
+        document.getElementById('webcam-container').innerHTML = '';
+        document.getElementById('label-container').innerHTML = '';
+        if (webcam) webcam.stop();
+    }
+
+    async function startDetection() {
+        document.getElementById("mainBox").style.display = "none";
+
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        const flip = true;
+        webcam = new tmImage.Webcam(300, 300, flip);
+        await webcam.setup();
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+        for (let i = 0; i < maxPredictions; i++) {
+            labelContainer.appendChild(document.createElement("div"));
         }
+    }
 
-        async function loop() {
-            webcam.update();
-            await predict();
-            window.requestAnimationFrame(loop);
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        for (let i = 0; i < maxPredictions; i++) {
+            const classPrediction =
+                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+            labelContainer.childNodes[i].innerHTML = classPrediction;
         }
+    }
+</script>
 
-        async function predict() {
-            const prediction = await model.predict(webcam.canvas);
-            for (let i = 0; i < maxPredictions; i++) {
-                const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-                labelContainer.childNodes[i].innerHTML = classPrediction;
-            }
-
-            handleLogic(prediction);
-        }
-
-        function handleLogic(pred) {
-            let mainBox = document.getElementById("mainBox");
-
-            const inProb = pred.find(p => p.className.toLowerCase() === "in");
-            const outProb = pred.find(p => p.className.toLowerCase() === "out");
-
-            if (!inProb || !outProb) return;
-
-            if (inProb.probability > 0.85) {
-                inScore++;
-                document.getElementById("inScore").innerText = inScore;
-                document.getElementById("goodSound").play();
-                mainBox.classList.add("flash-good");
-                setTimeout(() => mainBox.classList.remove("flash-good"), 300);
-            }
-
-            if (outProb.probability > 0.85) {
-                outScore++;
-                document.getElementById("outScore").innerText = outScore;
-                document.getElementById("badSound").play();
-                mainBox.classList.add("flash-bad");
-                setTimeout(() => mainBox.classList.remove("flash-bad"), 300);
-            }
-        }
-
-        function toggleTheme() {
-            document.body.classList.toggle("lightMode");
-        }
-    </script>
 </body>
 </html>
