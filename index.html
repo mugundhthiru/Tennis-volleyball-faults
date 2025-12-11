@@ -1,173 +1,365 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Ball Detection</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            transition: 0.4s;
-            background: #101010;
-            color: white;
-            text-align: center;
-        }
-
-        #mainBox {
-            padding: 20px;
-            transition: 0.4s;
-        }
-
-        .img-row img {
-            width: 120px;
-            margin: 10px;
-            border-radius: 10px;
-            transition: 0.4s;
-        }
-
-        button {
-            background: #444;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            font-size: 18px;
-            border-radius: 10px;
-            cursor: pointer;
-            margin: 10px;
-            transition: 0.3s;
-        }
-        button:hover { background: #666; }
-
-        /* THEMES */
-        .tennis-theme {
-            background: linear-gradient(#0f0, #060);
-        }
-        .volleyball-theme {
-            background: linear-gradient(#008cff, #003e7a);
-        }
-
-        .tennis-img {
-            border: 4px solid #00ff00;
-        }
-
-        .volleyball-img {
-            border: 4px solid #009dff;
-        }
-
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ball In/Out & Foot-Fault Detector</title>
+  <style>
+    :root{
+      --bg:#0f1113; --card:#17181a; --muted:#999;
+      --tennis-accent:#00ff66; /* bright green accent on dark */
+      --volley-accent:#69b7ff; /* muted blue */
+      --volley-accent-2:#f2f9ff; /* off-white */
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:var(--bg);color:#fff;min-height:100vh;display:flex}
+    /* sidebar */
+    aside.sidebar{width:84px;background:#0d0d0e;padding:14px;display:flex;flex-direction:column;align-items:center;gap:14px}
+    .side-btn{background:transparent;border:0;color:#cfcfcf;width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:22px}
+    .side-btn:hover{background:#1a1a1a;color:#fff;transform:translateY(-4px)}
+    header.topbar{position:fixed;left:84px;right:0;height:64px;background:linear-gradient(90deg,#0006,transparent);display:flex;align-items:center;padding:0 20px;gap:16px;z-index:20}
+    .top-title{font-weight:800}
+    .mode-label{margin-left:auto;font-weight:700;color:var(--muted);font-size:13px}
+    /* pages area */
+    main.pages{flex:1;margin-left:84px;padding-top:64px;position:relative;overflow:hidden}
+    .page{position:absolute;inset:0;padding:28px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;transition:transform 420ms cubic-bezier(.2,.9,.25,1),opacity 420ms,filter 420ms}
+    .hidden-left{transform:translateX(-120%);opacity:0;filter:blur(2px)}
+    .hidden-right{transform:translateX(120%);opacity:0;filter:blur(2px)}
+    .visible{transform:translateX(0);opacity:1;filter:none}
+    /* home layout */
+    h1{margin:10px 0 12px}
+    .big-btns{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:18px 0}
+    .big-card{background:var(--card);padding:20px;border-radius:14px;min-width:220px;max-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+    .big-card img{width:110px;height:110px;object-fit:cover;border-radius:12px}
+    .choose-btn{margin-top:12px;background:linear-gradient(90deg,var(--tennis-accent),#00e676);border:0;padding:10px 16px;border-radius:999px;color:#000;font-weight:700;cursor:pointer}
+    /* detector */
+    .detector{display:flex;gap:20px;align-items:flex-start;max-width:1100px;width:100%;margin-top:12px}
+    .left{flex:1}
+    .right{width:320px}
+    #webcam-box{position:relative;border-radius:14px;overflow:hidden;background:#000;padding:6px;border:1px solid #111}
+    #webcam-canvas{display:block;width:100%;height:auto;border-radius:10px;background:#000}
+    .court-bg{position:absolute;inset:0;background-size:cover;opacity:0.14;pointer-events:none;filter:blur(1px)}
+    .result-badge{position:absolute;left:12px;bottom:12px;padding:10px 16px;border-radius:12px;font-weight:800;font-size:20px;background:rgba(0,0,0,0.6)}
+    .result-in{color:#000;background:#b6ffcf}
+    .result-out{color:#fff;background:#ff6b6b}
+    .meter{height:14px;background:#111;border-radius:999px;overflow:hidden;margin-top:10px}
+    .meter > div{height:100%;width:0%;background:linear-gradient(90deg,var(--tennis-accent),#b8ffb0);transition:width 220ms}
+    .card{background:var(--card);padding:12px;border-radius:12px}
+    /* small screens */
+    @media(max-width:980px){aside.sidebar{display:none} header.topbar{left:0} main.pages{margin-left:0} .right{width:100%} .detector{flex-direction:column}}
+    /* footer */
+    footer.sitefoot{position:fixed;left:84px;right:0;bottom:0;padding:8px 20px;color:#aaa;font-size:13px;background:linear-gradient(180deg,transparent,#0008)}
+    /* buttons */
+    .icon-btn{background:#1b1b1b;padding:10px;border-radius:10px;border:0;color:#fff;cursor:pointer}
+  </style>
 </head>
 <body>
+  <!-- Sidebar -->
+  <aside class="sidebar" aria-hidden>
+    <button class="side-btn" title="Home" onclick="goTo('home')">🏠</button>
+    <button class="side-btn" title="Tennis" onclick="goTo('tennis')">🎾</button>
+    <button class="side-btn" title="Volleyball" onclick="goTo('volley')">🏐</button>
+    <button class="side-btn" title="Detect" onclick="goTo('detect')">🎥</button>
+    <button class="side-btn" title="Instructions" onclick="goTo('instructions')">❓</button>
+  </aside>
 
-    <button onclick="goHome()">Home</button>
-        <h1 id="modeStatus">Mode: Default</h1>
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="top-title">Ball In/Out & Foot-Fault Detector</div>
+    <div class="mode-label" id="modeLabel">Mode: Tennis (IN / OUT / FOOT FAULT / NO FOOT FAULT)</div>
+  </header>
 
-    <div id="mainBox">
-        <div class="img-row" id="imageRow">
-            <img id="img1" src="https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg">
-            <img id="img2" src="https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg">
-            <img id="img3" src="https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg">
+  <main class="pages">
+    <!-- HOME -->
+    <section id="home" class="page visible">
+      <h1>Ball In/Out & Foot-Fault Detector</h1>
+      <p style="max-width:760px;text-align:center;color:#cfcfcf;">This site uses a Teachable Machine image model (4 classes) with your webcam to decide whether a serve/hit is <strong>IN</strong>, <strong>OUT</strong>, a <strong>FOOT FAULT</strong>, or <strong>NO FOOT FAULT</strong>. Great for referees, coaches, and PE teachers.</p>
+
+      <div class="big-btns">
+        <div class="big-card">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg" alt="tennis ball">
+          <h3>Tennis Detector</h3>
+          <p style="color:var(--muted)">Mostly dark with bright green accents.</p>
+          <button class="choose-btn" onclick="applyTheme('tennis'); goTo('tennis')">Choose Tennis</button>
         </div>
 
-        <button onclick="setTennis()">Switch to Tennis Theme</button>
-        <button onclick="setVolleyball()">Switch to Volleyball Theme</button>
-        <br>
-        <button onclick="startDetection()">Start Detection</button>
-    </div>
+        <div class="big-card">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Volleyball_%28International%29.png" alt="volleyball">
+          <h3>Volleyball Detector</h3>
+          <p style="color:var(--muted)">Muted blue / white / red palette.</p>
+          <button class="choose-btn" style="background:linear-gradient(90deg,var(--volley-accent),#9ed7ff)" onclick="applyTheme('volley'); goTo('volley')">Choose Volleyball</button>
+        </div>
+      </div>
 
-    <div id="webcam-container"></div>
-    <div id="label-container"></div>
+      <div style="margin-top:18px">
+        <button class="icon-btn" id="homeStart" onclick="startWebcamFromHome()">Start Webcam</button>
+        <button class="icon-btn" onclick="goTo('instructions')">Instructions</button>
+      </div>
+    </section>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-<script>
-    let lastTheme = "default";
+    <!-- INSTRUCTIONS (simple) -->
+    <section id="instructions" class="page hidden-right">
+      <h1>How to Use (Quick)</h1>
+      <p style="max-width:780px;color:#d1d1d1;text-align:left">
+        1) Choose Tennis or Volleyball to apply the theme.<br>
+        2) Click "Start Webcam" (Home or Detection). Allow camera access.<br>
+        3) Hold the scene up to the camera (serve, ball, or image).<br>
+        4) Read the big result badge: <strong>IN</strong> (green) or <strong>OUT</strong> (red), or <strong>FOOT FAULT</strong> / <strong>NO FOOT FAULT</strong> for tennis.<br>
+      </p>
+      <div style="margin-top:18px">
+        <button class="icon-btn" onclick="goTo('home')">Back Home</button>
+        <button class="icon-btn" onclick="goTo('detect')">Go to Detection</button>
+      </div>
+    </section>
 
-    const tennisImages = [
-        "https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/8/85/Tennis_ball_01.jpg"
-    ];
+    <!-- TENNIS PAGE -->
+    <section id="tennis" class="page hidden-right">
+      <h1>🎾 Tennis Mode</h1>
+      <p style="max-width:700px;color:#d1d1d1">Tennis mode uses a mostly dark UI with bright green accents. It reports: IN, OUT, FOOT FAULT, or NO FOOT FAULT.</p>
+      <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;justify-content:center">
+        <button class="icon-btn" onclick="applyTheme('tennis')">Apply Tennis Theme</button>
+        <button class="icon-btn" onclick="goTo('detect')">Go to Detection</button>
+        <button class="icon-btn" onclick="goTo('home')">Back Home</button>
+      </div>
+    </section>
 
-    const volleyballImages = [
-        "https://upload.wikimedia.org/wikipedia/commons/7/7e/Volleyball_%28International%29.png",
-        "https://upload.wikimedia.org/wikipedia/commons/7/7e/Volleyball_%28International%29.png",
-        "https://upload.wikimedia.org/wikipedia/commons/7/7e/Volleyball_%28International%29.png"
-    ];
+    <!-- VOLLEY PAGE -->
+    <section id="volley" class="page hidden-right">
+      <h1>🏐 Volleyball Mode</h1>
+      <p style="max-width:700px;color:#d1d1d1">Volleyball mode uses muted blues and off-white accents. It reports IN / OUT (the model still includes foot-fault labels but volleyball typically ignores foot faults).</p>
+      <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;justify-content:center">
+        <button class="icon-btn" onclick="applyTheme('volley')">Apply Volleyball Theme</button>
+        <button class="icon-btn" onclick="goTo('detect')">Go to Detection</button>
+        <button class="icon-btn" onclick="goTo('home')">Back Home</button>
+      </div>
+    </section>
 
-    const originalImages = [...tennisImages];
+    <!-- DETECTION PAGE -->
+    <section id="detect" class="page hidden-right">
+      <h1>Live Detection</h1>
+      <div class="detector">
+        <div class="left">
+          <div id="webcam-box">
+            <div class="court-bg" id="courtBg"></div>
+            <canvas id="webcam-canvas"></canvas>
+            <div id="resultBadge" class="result-badge">Idle</div>
+          </div>
 
-    function setTennis() {
-        document.body.className = "tennis-theme";
-        lastTheme = "tennis";
-        document.getElementById("modeStatus").textContent = "Mode: Tennis";
+          <div style="margin-top:12px" class="card">
+            <strong>Predictions</strong>
+            <div id="label-container" style="margin-top:8px;color:#cfcfcf"></div>
+            <div class="meter" aria-hidden>
+              <div id="confBar"></div>
+            </div>
+          </div>
+        </div>
 
-        document.querySelectorAll('.img-row img').forEach((img, i) => {
-            img.src = tennisImages[i];
-            img.className = "tennis-img";
-        });
-    }
+        <aside class="right">
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+              <div>
+                <div style="font-size:14px;color:#bbb">Scores (example)</div>
+                <div style="font-size:22px;font-weight:800">In: <span id="inScore">0</span>  Out: <span id="outScore">0</span></div>
+              </div>
+              <div>
+                <button class="icon-btn" id="speakToggle">🔊 Speak</button>
+              </div>
+            </div>
 
-    function setVolleyball() {
-        document.body.className = "volleyball-theme";
-        lastTheme = "volleyball";
-        document.getElementById("modeStatus").textContent = "Mode: Volleyball";
+            <hr style="margin:12px 0 10px;border:none;border-top:1px solid #222">
+            <div style="text-align:left;line-height:1.5;color:#d1d1d1">
+              <div><strong>Instructions</strong></div>
+              <ol>
+                <li>Choose Tennis or Volleyball to set theme (left icons).</li>
+                <li>Click "Start Webcam" (Home or below) and allow camera.</li>
+                <li>Hold the scene clearly in front of the camera.</li>
+                <li>Listen/read the result badge (speak toggle on the right).</li>
+              </ol>
+            </div>
 
-        document.querySelectorAll('.img-row img').forEach((img, i) => {
-            img.src = volleyballImages[i];
-            img.className = "volleyball-img";
-        });
-    }
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="icon-btn" id="startCam">Start Webcam</button>
+              <button class="icon-btn" id="stopCam">Stop Webcam</button>
+              <button class="icon-btn" id="resetScores">Reset Scores</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
 
-    /* LOAD AI MODEL + SWITCH TO ORIGINAL DETECTION SCREEN */
+  <footer class="sitefoot">Made for a classroom project • Put your Teachable Machine files (model.json, metadata.json, weights) in <code>./my_model/</code></footer>
 
-    const URL = "./my_model/";
-    let model, webcam, labelContainer, maxPredictions;
+  <!-- Sounds -->
+  <!-- nav swish -->
+  <audio id="navSound" src="https://actions.google.com/sounds/v1/transportation/metal_door_swing.ogg"></audio>
+  <!-- IN = ding -->
+  <audio id="inSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+  <!-- OUT = error beep -->
+  <audio id="outSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
-    function goHome() {
-        // Reset to main screen
-        document.getElementById('mainBox').style.display = 'block';
-        document.getElementById('webcam-container').innerHTML = '';
-        document.getElementById('label-container').innerHTML = '';
-        if (webcam) webcam.stop();
-    }
+  <!-- Teachable Machine libs -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
-    async function startDetection() {
-        document.getElementById("mainBox").style.display = "none";
+  <script>
+    // --------- state ----------
+    const pages = ['home','instructions','tennis','volley','detect'];
+    let currentPage = 'home';
+    let theme = 'tennis';
+    const modelURLFolder = './my_model/'; // put your model files here
+    let model, webcam, maxPredictions;
+    let running = false, speak = true;
+    let inScore = 0, outScore = 0;
 
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
-
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
-
-        const flip = true;
-        webcam = new tmImage.Webcam(300, 300, flip);
-        await webcam.setup();
-        await webcam.play();
-        window.requestAnimationFrame(loop);
-
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) {
-            labelContainer.appendChild(document.createElement("div"));
+    // Initial layout
+    function goTo(target){
+      if(!pages.includes(target)) return;
+      try { document.getElementById('navSound').play().catch(()=>{}); } catch(e){}
+      pages.forEach(p=>{
+        const el = document.getElementById(p);
+        if(!el) return;
+        if(p === target){ el.classList.remove('hidden-left','hidden-right'); el.classList.add('visible'); }
+        else {
+          // decide left/right based on index difference (simple)
+          const iFrom = pages.indexOf(currentPage), iTo = pages.indexOf(p), iTarget = pages.indexOf(target);
+          if(iTo < iTarget) el.classList.add('hidden-left'); else el.classList.add('hidden-right');
+          el.classList.remove('visible');
         }
+      });
+      currentPage = target;
     }
 
-    async function loop() {
-        webcam.update();
-        await predict();
-        window.requestAnimationFrame(loop);
+    // theme application
+    function applyTheme(t){
+      if(t === 'tennis'){
+        document.body.style.setProperty('--tennis-accent', 'var(--tennis-accent)');
+        document.body.classList.remove('volley-theme');
+        theme = 'tennis';
+        document.getElementById('modeLabel').textContent = 'Mode: Tennis (IN / OUT / FOOT FAULT / NO FOOT FAULT)';
+        document.getElementById('courtBg').style.backgroundImage = "url('https://upload.wikimedia.org/wikipedia/commons/8/84/Grass_tennis_court.jpg')";
+        // tweak colours: mostly dark background, bright green accents
+        document.documentElement.style.setProperty('--accent-main', '#000');
+        document.querySelectorAll('.choose-btn').forEach(b=>b.style.background = 'linear-gradient(90deg,var(--tennis-accent),#00e676)');
+        document.getElementById('confBar').style.background = 'linear-gradient(90deg,var(--tennis-accent),#b8ffb0)';
+      } else {
+        document.body.classList.remove('tennis-theme');
+        theme = 'volley';
+        document.getElementById('modeLabel').textContent = 'Mode: Volleyball (IN / OUT)';
+        document.getElementById('courtBg').style.backgroundImage = "url('https://upload.wikimedia.org/wikipedia/commons/4/4d/Volleyball_court.jpg')";
+        document.querySelectorAll('.choose-btn').forEach(b=>b.style.background = 'linear-gradient(90deg,var(--volley-accent),#9ed7ff)');
+        document.getElementById('confBar').style.background = 'linear-gradient(90deg,var(--volley-accent),#dff5ff)';
+      }
     }
 
-    async function predict() {
-        const prediction = await model.predict(webcam.canvas);
-        for (let i = 0; i < maxPredictions; i++) {
-            const classPrediction =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-            labelContainer.childNodes[i].innerHTML = classPrediction;
+    // UI result updates
+    function setResult(label, conf){
+      const badge = document.getElementById('resultBadge');
+      const confBar = document.getElementById('confBar');
+      if(!badge) return;
+      badge.textContent = label.toUpperCase();
+      if(label.toLowerCase().includes('in')){
+        badge.className = 'result-badge result-in';
+        try { document.getElementById('inSound').play().catch(()=>{}); } catch(e){}
+      } else {
+        badge.className = 'result-badge result-out';
+        try { document.getElementById('outSound').play().catch(()=>{}); } catch(e){}
+      }
+      confBar.style.width = Math.round(conf*100) + '%';
+      if(speak){
+        try{
+          const s = new SpeechSynthesisUtterance(label);
+          speechSynthesis.speak(s);
+        }catch(e){}
+      }
+    }
+
+    // Start webcam from home (also available on detect page)
+    async function startWebcamFromHome(){
+      goTo('detect');
+      await startWebcam();
+    }
+
+    // start/stop webcam + model
+    async function startWebcam(){
+      if(running) return;
+      // load model if not loaded
+      if(!model){
+        try{
+          model = await tmImage.load(modelURLFolder + 'model.json', modelURLFolder + 'metadata.json');
+          maxPredictions = model.getTotalClasses();
+        } catch(e){
+          alert('Failed to load model. Make sure model files (model.json, metadata.json, weights) are in ./my_model/');
+          return;
         }
+      }
+      // setup webcam
+      webcam = new tmImage.Webcam(480,360,true);
+      await webcam.setup();
+      await webcam.play();
+      const canvasElement = document.getElementById('webcam-canvas');
+      canvasElement.replaceWith(webcam.canvas);
+      webcam.canvas.id = 'webcam-canvas';
+      running = true;
+      // loop
+      predictionLoop();
     }
-</script>
 
+    async function stopWebcam(){
+      if(!running) return;
+      running = false;
+      try{ webcam.stop(); } catch(e){}
+      const canvas = document.createElement('canvas');
+      canvas.id = 'webcam-canvas';
+      document.getElementById('webcam-box').querySelector('canvas')?.replaceWith(canvas);
+      document.getElementById('resultBadge').textContent = 'Stopped';
+      document.getElementById('label-container').innerHTML = '';
+      document.getElementById('confBar').style.width = '0%';
+    }
+
+    document.getElementById('startCam')?.addEventListener('click', startWebcam);
+    document.getElementById('stopCam')?.addEventListener('click', stopWebcam);
+    document.getElementById('resetScores')?.addEventListener('click', ()=>{ inScore = 0; outScore = 0; document.getElementById('inScore').textContent = '0'; document.getElementById('outScore').textContent = '0'; });
+    document.getElementById('speakToggle')?.addEventListener('click', ()=>{ speak = !speak; document.getElementById('speakToggle').textContent = speak ? '🔊 Speak' : '🔈 Mute'; });
+
+    // also add Start Webcam on Home button
+    document.getElementById('homeStart')?.addEventListener('click', startWebcamFromHome);
+
+    // prediction loop
+    async function predictionLoop(){
+      while(running){
+        try{
+          webcam.update();
+          const prediction = await model.predict(webcam.canvas);
+          // sort descending by probability
+          prediction.sort((a,b)=>b.probability - a.probability);
+          const top = prediction[0];
+          const label = top.className;
+          const conf = top.probability;
+          // show all
+          const list = prediction.map(p => `<div style="padding:4px 0;color:#cfcfcf">${p.className}: ${(p.probability*100).toFixed(1)}%</div>`).join('');
+          document.getElementById('label-container').innerHTML = list;
+          setResult(label, conf);
+          // update scores when confident
+          if(conf > 0.86){
+            if(label.toLowerCase().includes('in')) inScore++; else outScore++;
+            document.getElementById('inScore').textContent = inScore;
+            document.getElementById('outScore').textContent = outScore;
+          }
+        }catch(err){
+          console.error(err);
+        }
+        // small delay to avoid too-fast loops
+        await new Promise(r=>setTimeout(r,700));
+      }
+    }
+
+    // small helper to allow starting from Home "Start Webcam" button when user clicks it
+    async function startWebcamFromHome(){ goTo('detect'); await startWebcam(); }
+
+    // initialize defaults
+    applyTheme('tennis');
+    goTo('home');
+  </script>
 </body>
 </html>
